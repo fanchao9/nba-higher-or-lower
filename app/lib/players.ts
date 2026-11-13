@@ -1,4 +1,6 @@
-import { PLACEHOLDER_PLAYERS } from "@/app/data/placeholder-players";
+// Pure game helpers. Keep this file free of data imports: it is bundled into
+// the client, and players.json is large. Data is loaded in load-players.ts
+// (server only) and passed down as props.
 
 export type Player = {
   id: number;
@@ -7,8 +9,6 @@ export type Player = {
 };
 
 export type Guess = "higher" | "lower";
-
-export const PLAYERS: Player[] = PLACEHOLDER_PLAYERS;
 
 export function headshotUrl(playerId: number): string {
   return `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
@@ -22,6 +22,14 @@ export function isGuessCorrect(
   return guess === "higher"
     ? revealed.ppg > known.ppg
     : revealed.ppg < known.ppg;
+}
+
+/**
+ * The game needs at least two players with different PPG, otherwise no guess
+ * has an answer. Check this before calling the pick functions below.
+ */
+export function hasEnoughPlayers(players: Player[]): boolean {
+  return new Set(players.map((p) => p.ppg)).size >= 2;
 }
 
 function randomItem<T>(items: T[]): T {
@@ -41,7 +49,8 @@ export function pickNextPlayer(
 ): { next: Player; seen: number[] } {
   const eligible = (p: Player) => p.id !== current.id && p.ppg !== current.ppg;
 
-  let pool = players.filter((p) => eligible(p) && !seen.includes(p.id));
+  const seenIds = new Set(seen);
+  let pool = players.filter((p) => eligible(p) && !seenIds.has(p.id));
   let nextSeen = seen;
   if (pool.length === 0) {
     pool = players.filter(eligible);

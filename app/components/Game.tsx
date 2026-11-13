@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import PlayerCard, { type StatTone } from "@/app/components/PlayerCard";
 import {
-  PLAYERS,
+  hasEnoughPlayers,
   isGuessCorrect,
   pickNextPlayer,
   pickStartingPair,
@@ -25,8 +25,8 @@ const SLIDE_MS = 650;
 
 const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
 
-function startRound(): Round {
-  const [left, right] = pickStartingPair(PLAYERS);
+function startRound(players: Player[]): Round {
+  const [left, right] = pickStartingPair(players);
   return { left, right, seen: [left.id, right.id] };
 }
 
@@ -34,7 +34,8 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export default function Game() {
+export default function Game({ players }: { players: Player[] }) {
+  const enoughPlayers = hasEnoughPlayers(players);
   const [round, setRound] = useState<Round | null>(null);
   const [phase, setPhase] = useState<Phase>("guessing");
   const [guess, setGuess] = useState<Guess | null>(null);
@@ -47,8 +48,8 @@ export default function Game() {
     round && guess ? isGuessCorrect(round.left, round.right, guess) : null;
 
   useEffect(() => {
-    setRound(startRound());
-  }, []);
+    if (enoughPlayers) setRound(startRound(players));
+  }, [players, enoughPlayers]);
 
   // animate the right player's stat from 0 up to the real value
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function Game() {
     if (phase !== "sliding" || !round) return;
 
     const timer = setTimeout(() => {
-      const { next, seen } = pickNextPlayer(PLAYERS, round.seen, round.right);
+      const { next, seen } = pickNextPlayer(players, round.seen, round.right);
       setRound({ left: round.right, right: next, seen });
       setGuess(null);
       setDisplayPpg(0);
@@ -111,7 +112,7 @@ export default function Game() {
     }, SLIDE_MS);
 
     return () => clearTimeout(timer);
-  }, [phase, round]);
+  }, [phase, round, players]);
 
   function handleGuess(choice: Guess) {
     if (phase !== "guessing") return;
@@ -121,7 +122,7 @@ export default function Game() {
   }
 
   function handlePlayAgain() {
-    setRound(startRound());
+    setRound(startRound(players));
     setScore(0);
     setGuess(null);
     setDisplayPpg(0);
@@ -147,6 +148,18 @@ export default function Game() {
         : round.right.ppg.toFixed(1);
 
   const arenaStyle = { "--slide-ms": `${SLIDE_MS}ms` } as CSSProperties;
+
+  if (!enoughPlayers) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
+        <h1 className="text-xl font-bold">Not enough player data</h1>
+        <p className="text-sm text-muted">
+          The game needs at least two players with different PPG in
+          app/data/players.json. Run the scraper (scripts/scrape_players.py).
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 py-5 sm:px-8 sm:py-10">
