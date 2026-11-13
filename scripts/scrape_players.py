@@ -289,6 +289,8 @@ def build_dataset(cache: dict) -> list[dict]:
         gp = stats["gp"]
         if not gp or gp < MIN_CAREER_GP:
             continue
+        season_ids = [r["season"] for r in stats.get("season_rows", [])]
+
         # Per-game rate stats, rounded to 1 decimal (None if never tracked).
         # Divide only by games from seasons where the stat was recorded, so
         # eras without steals/blocks (pre-1973-74) don't drag the average down.
@@ -310,6 +312,9 @@ def build_dataset(cache: dict) -> list[dict]:
             "name": rec["name"],
             "teams": stats["teams"],
             "seasons": stats["seasons"],
+            # first/last season played, e.g. "1984-85" (for era filters)
+            "first_season": min(season_ids) if season_ids else None,
+            "last_season": max(season_ids) if season_ids else None,
             "gp": gp,
             # counting totals
             "pts": stats["pts"],
