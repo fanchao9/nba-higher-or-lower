@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f3ebdc;
+  --foreground: #2b2419;
+  --surface: #faf5e9;
+  --surface-raised: #fffdf7;
+  --photo: #eadfc6;
+  --muted: #76694f;
+  --border: #dccfb4;
+  --accent: #b9552f;
+  --accent-contrast: #fffaf0;
+  --correct: #2f7d4f;
+  --wrong: #b53a2f;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-photo: var(--photo);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-correct: var(--correct);
+  --color-wrong: var(--wrong);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card-enter {
+  animation: card-enter 500ms ease-out backwards;
+}
+
+.card-sliding {
+  transition: transform var(--slide-ms, 650ms) cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.card-leaving {
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity calc(var(--slide-ms, 650ms) * 0.7) ease,
+    transform calc(var(--slide-ms, 650ms) * 0.7) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-enter {
+    animation: none;
+  }
+  .card-sliding,
+  .card-leaving {
+    transition-duration: 1ms;
+  }
 }

@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.nba.com",
+        pathname: "/headshots/nba/**",
+      },
+    ],
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
