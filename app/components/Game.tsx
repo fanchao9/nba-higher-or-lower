@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import PlayerCard, { type StatTone } from "@/app/components/PlayerCard";
+import { DEFAULT_FILTERS, filterPlayers } from "@/app/lib/filters";
 import {
   hasEnoughPlayers,
   isGuessCorrect,
@@ -9,6 +16,7 @@ import {
   pickStartingPair,
   type Guess,
   type Player,
+  type PpgGap,
 } from "@/app/lib/players";
 
 type Phase = "guessing" | "counting" | "result" | "sliding" | "gameover";
@@ -25,8 +33,8 @@ const SLIDE_MS = 650;
 
 const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
 
-function startRound(players: Player[]): Round {
-  const [left, right] = pickStartingPair(players);
+function startRound(pool: Player[], gap: PpgGap): Round {
+  const [left, right] = pickStartingPair(pool, gap);
   return { left, right, seen: [left.id, right.id] };
 }
 
@@ -35,7 +43,10 @@ function prefersReducedMotion(): boolean {
 }
 
 export default function Game({ players }: { players: Player[] }) {
-  const enoughPlayers = hasEnoughPlayers(players);
+  const filters = DEFAULT_FILTERS;
+  const gap = filters.ppgGap;
+  const pool = useMemo(() => filterPlayers(players, filters), [players, filters]);
+  const enoughPlayers = useMemo(() => hasEnoughPlayers(pool, gap), [pool, gap]);
   const [round, setRound] = useState<Round | null>(null);
   const [phase, setPhase] = useState<Phase>("guessing");
   const [guess, setGuess] = useState<Guess | null>(null);
@@ -47,9 +58,11 @@ export default function Game({ players }: { players: Player[] }) {
   const correct =
     round && guess ? isGuessCorrect(round.left, round.right, guess) : null;
 
+  // Random picks must not run during server prerender, so start on the client.
   useEffect(() => {
-    if (enoughPlayers) setRound(startRound(players));
-  }, [players, enoughPlayers]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only random init
+    if (enoughPlayers) setRound(startRound(pool, gap));
+  }, [pool, gap, enoughPlayers]);
 
   // animate the right player's stat from 0 up to the real value
   useEffect(() => {
@@ -103,7 +116,12 @@ export default function Game({ players }: { players: Player[] }) {
     if (phase !== "sliding" || !round) return;
 
     const timer = setTimeout(() => {
-      const { next, seen } = pickNextPlayer(players, round.seen, round.right);
+      const { next, seen } = pickNextPlayer(
+        pool,
+        round.seen,
+        round.right,
+        gap,
+      );
       setRound({ left: round.right, right: next, seen });
       setGuess(null);
       setDisplayPpg(0);
@@ -112,7 +130,7 @@ export default function Game({ players }: { players: Player[] }) {
     }, SLIDE_MS);
 
     return () => clearTimeout(timer);
-  }, [phase, round, players]);
+  }, [phase, round, pool, gap]);
 
   function handleGuess(choice: Guess) {
     if (phase !== "guessing") return;
@@ -122,7 +140,7 @@ export default function Game({ players }: { players: Player[] }) {
   }
 
   function handlePlayAgain() {
-    setRound(startRound(players));
+    setRound(startRound(pool, gap));
     setScore(0);
     setGuess(null);
     setDisplayPpg(0);
@@ -154,8 +172,10 @@ export default function Game({ players }: { players: Player[] }) {
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
         <h1 className="text-xl font-bold">Not enough player data</h1>
         <p className="text-sm text-muted">
-          The game needs at least two players with different PPG in
-          app/data/players.json. Run the scraper (scripts/scrape_players.py).
+          No two players match the current filters (see DEFAULT_FILTERS in
+          app/lib/filters.ts) in app/data/players.json. Loosen the filters, or
+          if players.json predates the first/last season fields, regenerate it
+          with scripts/scrape_players.py --resume.
         </p>
       </main>
     );
