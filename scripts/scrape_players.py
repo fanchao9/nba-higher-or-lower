@@ -7,6 +7,8 @@ WHAT IT DOES
      season's stat line from stats.nba.com (one request per player).
   3. Filters to "notable" players (min career games played).
   4. For notable players only, fetches their awards (one more request each).
+     (A cache from an older version also gets a one-time backfill of career
+     FG%/3P%/FT%: one extra request per notable player, ~20 minutes.)
   5. Computes per-game rate stats + a popularity proxy.
   6. Keeps only each player's AWARD-WINNING seasons (see AWARD_CODES), with
      that season's stats, for the season-vs-season game mode.
@@ -109,6 +111,10 @@ def _float(v) -> float | None:
     return None if _missing(v) else float(v)
 
 
+def _round3(v: float | None) -> float | None:
+    return None if v is None else round(v, 3)
+
+
 def _with_retries(call):
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -196,6 +202,9 @@ def fetch_career_totals(player_id: int) -> dict | None:
             "stl": _int(row["STL"]),
             "blk": _int(row["BLK"]),
             "fg3m": _int(row["FG3M"]),
+            "fg_pct": _float(row["FG_PCT"]),
+            "fg3_pct": _float(row["FG3_PCT"]),
+            "ft_pct": _float(row["FT_PCT"]),
             "teams": teams,
             "seasons": distinct_seasons,
             "season_rows": summarize_seasons(seasons) if not seasons.empty else [],
@@ -323,6 +332,10 @@ def build_dataset(cache: dict) -> list[dict]:
             "stl": stats["stl"],
             "blk": stats["blk"],
             "fg3m": stats["fg3m"],
+            # career shooting percentages
+            "fg_pct": _round3(stats.get("fg_pct")),
+            "fg3_pct": _round3(stats.get("fg3_pct")),
+            "ft_pct": _round3(stats.get("ft_pct")),
             # per-game averages
             "ppg": pg("pts"),
             "rpg": pg("reb"),
@@ -362,7 +375,7 @@ def main() -> None:
     print(f"Filter: >= {MIN_CAREER_GP} career games, regular season only\n")
 
     # Stage 1: career + per-season stats for every player
-    print("Stage 1/2: career and season stats")
+    print("Stage 1/3: career and season stats")
     for i, p in enumerate(roster, start=1):
         pid = str(p["id"])
         name = p["full_name"]
@@ -387,7 +400,6 @@ def main() -> None:
 
     save_cache(cache)
 
-    # Stage 2: awards, only for players who pass the games filter
     roster_ids = {str(p["id"]) for p in roster}
     notable = [
         (pid, rec) for pid, rec in cache.items()
@@ -396,7 +408,27 @@ def main() -> None:
         and rec["stats"]["gp"]
         and rec["stats"]["gp"] >= MIN_CAREER_GP
     ]
-    print(f"\nStage 2/2: awards for {len(notable)} notable players")
+
+    # Stage 2: backfill career shooting percentages. Caches built before
+    # those fields existed need one extra request per notable player (once).
+    missing = [(pid, rec) for pid, rec in notable if "fg_pct" not in rec["stats"]]
+    print(f"\nStage 2/3: shooting percentages for {len(missing)} notable players")
+    for n, (pid, rec) in enumerate(missing, start=1):
+        print(f"[{n}/{len(missing)}] {rec['name']} (id={pid}) shooting %")
+        stats = fetch_career_totals(int(pid))
+        if stats is not None:
+            rec["stats"] = stats
+
+        if n % 20 == 0:
+            save_cache(cache)
+            print(f"    ...cache checkpoint saved ({len(cache)} entries)")
+
+        time.sleep(REQUEST_PAUSE_SEC)
+
+    save_cache(cache)
+
+    # Stage 3: awards, only for players who pass the games filter
+    print(f"\nStage 3/3: awards for {len(notable)} notable players")
     for n, (pid, rec) in enumerate(notable, start=1):
         if args.resume and "awards" in rec:
             continue
