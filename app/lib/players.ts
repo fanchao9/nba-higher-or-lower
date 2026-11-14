@@ -1,119 +1,162 @@
-// Pure game helpers. Keep this file free of data imports: it is bundled into
-// the client, and players.json is large. Data is loaded in load-players.ts
-// (server only) and passed down as props.
+import { STATS, type StatKey, type StatLine } from "@/app/lib/stats";
 
-export type Player = {
+export type SeasonRecord = {
+  season: string;
+  team: string | null;
+  awards: string[];
+  stats: StatLine;
+};
+
+export type PlayerRecord = {
   id: number;
   name: string;
-  ppg: number;
-  lastSeason?: string | null;
-  awardSeasons?: number;
-  gp?: number;
+  firstSeason: string | null;
+  lastSeason: string | null;
+  career: StatLine;
+  seasons: SeasonRecord[];
+};
+
+export type Entry = {
+  key: string;
+  playerId: number;
+  name: string;
+  season: string | null;
+  team: string | null;
+  awards: string[];
+  stats: StatLine;
 };
 
 export type Guess = "higher" | "lower";
-
-export type PpgGap = { min: number; max: number };
-
-const SMALLEST_DIFF = 0.01;
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-export function ppgDifference(a: Player, b: Player): number {
-  return round2(Math.abs(a.ppg - b.ppg));
-}
-
-export function isValidPair(a: Player, b: Player, gap: PpgGap): boolean {
-  if (a.id === b.id) return false;
-  const diff = ppgDifference(a, b);
-  return diff >= Math.max(gap.min, SMALLEST_DIFF) && diff <= gap.max;
-}
 
 export function headshotUrl(playerId: number): string {
   return `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
 }
 
-export function isGuessCorrect(
-  known: Player,
-  revealed: Player,
-  guess: Guess,
-): boolean {
-  return guess === "higher"
-    ? revealed.ppg > known.ppg
-    : revealed.ppg < known.ppg;
+const SMALLEST_DIFF = 0.01;
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+function statDifference(a: Entry, b: Entry, stat: StatKey): number | null {
+  const av = a.stats[stat];
+  const bv = b.stats[stat];
+  return av === null || bv === null ? null : round2(Math.abs(av - bv));
 }
 
-export function hasEnoughPlayers(players: Player[], gap: PpgGap): boolean {
-  const minDiff = Math.max(gap.min, SMALLEST_DIFF);
-  const ppgs = players.map((p) => p.ppg).sort((x, y) => x - y);
-  let j = 0;
-  for (let i = 0; i < ppgs.length; i++) {
-    if (j <= i) j = i + 1;
-    // Smallest partner at or above the minimum gap; it only moves forward.
-    while (j < ppgs.length && round2(ppgs[j] - ppgs[i]) < minDiff) j++;
-    if (j < ppgs.length && round2(ppgs[j] - ppgs[i]) <= gap.max) return true;
-  }
-  return false;
+export function isValidPair(a: Entry, b: Entry, stat: StatKey): boolean {
+  if (a.playerId === b.playerId) return false;
+  const diff = statDifference(a, b, stat);
+  if (diff === null) return false;
+  const gap = STATS[stat].gap;
+  return diff >= Math.max(gap.min, SMALLEST_DIFF) && diff <= gap.max;
+}
+
+export function isGuessCorrect(
+  left: Entry,
+  right: Entry,
+  stat: StatKey,
+  guess: Guess,
+): boolean {
+  const l = left.stats[stat];
+  const r = right.stats[stat];
+  if (l === null || r === null) return false;
+  return guess === "higher" ? r > l : r < l;
+}
+
+export function hasEnoughEntries(entries: Entry[], stats: StatKey[]): boolean {
+  return entries.some((a) =>
+    entries.some((b) => stats.some((s) => isValidPair(a, b, s))),
+  );
 }
 
 function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-// Players (other than `current`) whose PPG is closest to it, at least `minDiff` away.
-function nearest(others: Player[], current: Player, minDiff: number): Player[] {
-  const candidates = others.filter((p) => ppgDifference(current, p) >= minDiff);
-  if (candidates.length === 0) return [];
-  const best = Math.min(...candidates.map((p) => ppgDifference(current, p)));
-  return candidates.filter((p) => ppgDifference(current, p) === best);
+function shuffled<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
-export function pickStartingPair(
-  players: Player[],
-  gap: PpgGap,
-): [Player, Player] {
-  // Prefer a first player who has at least one valid partner.
-  const withPartner = players.filter((p) =>
-    players.some((q) => isValidPair(p, q, gap)),
-  );
-  const first = randomItem(withPartner.length > 0 ? withPartner : players);
-  const { next } = pickNextPlayer(players, [first.id], first, gap);
-  return [first, next];
+function nearest(
+  others: Entry[],
+  current: Entry,
+  stat: StatKey,
+  minDiff: number,
+): Entry[] {
+  const scored = others.flatMap((e) => {
+    const diff = statDifference(current, e, stat);
+    return diff !== null && diff >= minDiff ? [{ e, diff }] : [];
+  });
+  if (scored.length === 0) return [];
+  const best = Math.min(...scored.map((s) => s.diff));
+  return scored.filter((s) => s.diff === best).map((s) => s.e);
 }
 
-/**
- * Next Player Preference order:
- *   1. valid pair (see isValidPair) and not shown yet this run
- *   2. valid pair, with the "already shown" list starting over
- *   3. fallback when `current` has no valid partner at all (e.g. an outlier
- *      scorer): the closest player at least the minimum gap away, then the
- *      closest non-tied player
- */
-export function pickNextPlayer(
-  players: Player[],
-  seen: number[],
-  current: Player,
-  gap: PpgGap,
-): { next: Player; seen: number[] } {
-  const others = players.filter((p) => p.id !== current.id);
-  const seenIds = new Set(seen);
-  const valid = (p: Player) => isValidPair(current, p, gap);
+export type Round = {
+  left: Entry;
+  right: Entry;
+  stat: StatKey;
+  seen: string[];
+};
 
-  let pool = others.filter((p) => valid(p) && !seenIds.has(p.id));
+export function pickNextRound(
+  entries: Entry[],
+  stats: StatKey[],
+  seen: string[],
+  current: Entry,
+): { stat: StatKey; next: Entry; seen: string[] } {
+  const others = entries.filter((e) => e.playerId !== current.playerId);
+  const seenKeys = new Set(seen);
+  const order = shuffled(stats).filter((s) => current.stats[s] !== null);
+
+  const pickValid = (skipSeen: boolean) => {
+    for (const stat of order) {
+      const pool = others.filter(
+        (e) => isValidPair(current, e, stat) && !(skipSeen && seenKeys.has(e.key)),
+      );
+      if (pool.length > 0) return { stat, next: randomItem(pool) };
+    }
+    return null;
+  };
+
+  const pickNearest = (minDiff: (stat: StatKey) => number) => {
+    for (const stat of order) {
+      const pool = nearest(others, current, stat, minDiff(stat));
+      if (pool.length > 0) return { stat, next: randomItem(pool) };
+    }
+    return null;
+  };
+
   let nextSeen = seen;
-  if (pool.length === 0) {
-    nextSeen = [current.id];
-    pool = others.filter(valid);
+  let hit = pickValid(true);
+  if (!hit) {
+    nextSeen = [current.key];
+    hit = pickValid(false);
   }
-  if (pool.length === 0) {
-    pool = nearest(others, current, Math.max(gap.min, SMALLEST_DIFF));
+  hit ??= pickNearest((s) => Math.max(STATS[s].gap.min, SMALLEST_DIFF));
+  hit ??= pickNearest(() => SMALLEST_DIFF);
+  if (!hit) throw new Error("pickNextRound: no entry with a different value");
+
+  return { stat: hit.stat, next: hit.next, seen: [...nextSeen, hit.next.key] };
+}
+
+export function pickStartingRound(entries: Entry[], stats: StatKey[]): Round {
+  const usable = entries.filter((e) => stats.some((s) => e.stats[s] !== null));
+  let first = randomItem(usable);
+  for (let i = 0; i < 40; i++) {
+    const candidate = randomItem(usable);
+    const hasPartner = usable.some((o) =>
+      stats.some((s) => isValidPair(candidate, o, s)),
+    );
+    if (hasPartner) {
+      first = candidate;
+      break;
+    }
   }
-  if (pool.length === 0) {
-    pool = nearest(others, current, SMALLEST_DIFF);
-  }
-  if (pool.length === 0) {
-    throw new Error("pickNextPlayer: no player with a different PPG");
-  }
-  const next = randomItem(pool);
-  return { next, seen: [...nextSeen, next.id] };
+  const { stat, next, seen } = pickNextRound(entries, stats, [first.key], first);
+  return { left: first, right: next, stat, seen };
 }
