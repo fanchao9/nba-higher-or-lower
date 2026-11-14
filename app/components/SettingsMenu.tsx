@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Switch from "@/app/components/Switch";
 import {
   DEFAULT_SETTINGS,
   buildEntries,
@@ -143,22 +144,11 @@ function SettingsForm({
             year vs another) instead of career averages.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={draft.seasonMode}
+        <Switch
+          checked={draft.seasonMode}
+          onChange={(seasonMode) => update({ seasonMode })}
           aria-labelledby="mode-label"
-          onClick={() => update({ seasonMode: !draft.seasonMode })}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-            draft.seasonMode ? "bg-accent" : "bg-border"
-          }`}
-        >
-          <span
-            className={`absolute left-0.5 top-0.5 size-6 rounded-full bg-surface-raised shadow transition-transform ${
-              draft.seasonMode ? "translate-x-5" : ""
-            }`}
-          />
-        </button>
+        />
       </div>
 
       {/* Year range */}

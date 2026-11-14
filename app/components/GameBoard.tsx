@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from "react";
 import PlayerCard, { type StatTone } from "@/app/components/PlayerCard";
+import Switch from "@/app/components/Switch";
 import type { GameSettings } from "@/app/lib/filters";
 import {
   hasEnoughEntries,
@@ -18,7 +19,7 @@ import {
   type Guess,
   type Round,
 } from "@/app/lib/players";
-import { STATS } from "@/app/lib/stats";
+import { STATS, formatStat } from "@/app/lib/stats";
 
 type Phase = "guessing" | "counting" | "result" | "sliding" | "gameover";
 
@@ -35,6 +36,8 @@ function prefersReducedMotion(): boolean {
 type GameBoardProps = {
   entries: Entry[];
   settings: GameSettings;
+  showAll: boolean;
+  onShowAllChange: (showAll: boolean) => void;
   onOpenSettings: () => void;
   onNewGame: () => void;
 };
@@ -42,6 +45,8 @@ type GameBoardProps = {
 export default function GameBoard({
   entries,
   settings,
+  showAll,
+  onShowAllChange,
   onOpenSettings,
   onNewGame,
 }: GameBoardProps) {
@@ -138,7 +143,13 @@ export default function GameBoard({
         round.seen,
         round.right,
       );
-      setRound({ left: round.right, right: next, stat, seen });
+      setRound({
+        left: round.right,
+        right: next,
+        stat,
+        prevStat: round.stat,
+        seen,
+      });
       setGuess(null);
       setDisplayValue(0);
       setSlideDx(0);
@@ -166,13 +177,13 @@ export default function GameBoard({
 
   const stat = round?.stat ?? stats[0];
   const statDef = STATS[stat];
-  const statLabel = `${seasonMode ? "Season" : "Career"} ${statDef.short}`;
-  const format = (v: number | null) => (v === null ? "–" : v.toFixed(1));
+  const scope = seasonMode ? "Season" : "Career";
+  const format = formatStat;
 
   const rightValue = !round
-    ? "?"
+    ? "??"
     : !revealed
-      ? "?"
+      ? "??"
       : phase === "counting"
         ? displayValue.toFixed(1)
         : format(round.right.stats[round.stat]);
@@ -241,7 +252,7 @@ export default function GameBoard({
         </div>
       </header>
 
-      <p className="mb-4 text-center text-sm font-medium text-muted sm:mb-6 sm:text-lg">
+      <p className="mb-3 text-center text-sm font-medium text-muted sm:mb-4 sm:text-lg">
         {round ? (
           <>
             Does <strong className="text-foreground">{round.right.name}</strong>
@@ -255,6 +266,21 @@ export default function GameBoard({
         )}
       </p>
 
+      <label className="mb-4 flex cursor-pointer items-center justify-center gap-2 self-center sm:mb-6">
+        <Switch
+          size="sm"
+          checked={showAll}
+          onChange={onShowAllChange}
+          aria-labelledby="show-all-label"
+        />
+        <span
+          id="show-all-label"
+          className="text-xs font-semibold text-muted sm:text-sm"
+        >
+          Show all stats
+        </span>
+      </label>
+
       <section
         ref={arenaRef}
         style={arenaStyle}
@@ -266,7 +292,10 @@ export default function GameBoard({
               key={round.left.key}
               entry={round.left}
               slot="left"
-              statLabel={statLabel}
+              stat={round.stat}
+              fromStat={round.prevStat}
+              scope={scope}
+              showAll={showAll}
               valueText={format(round.left.stats[round.stat])}
               motion={phase === "sliding" ? "leave" : "idle"}
             />
@@ -274,7 +303,9 @@ export default function GameBoard({
               key={round.right.key}
               entry={round.right}
               slot="right"
-              statLabel={statLabel}
+              stat={round.stat}
+              scope={scope}
+              showAll={showAll}
               valueText={rightValue}
               tone={rightTone}
               motion={phase === "sliding" ? "slide" : "idle"}

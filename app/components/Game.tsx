@@ -20,6 +20,7 @@ export default function Game({ players }: { players: PlayerRecord[] }) {
   );
   const [gameId, setGameId] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const entries = useMemo(
     () => buildEntries(players, settings),
@@ -38,6 +39,8 @@ export default function Game({ players }: { players: PlayerRecord[] }) {
         key={gameId}
         entries={entries}
         settings={settings}
+        showAll={showAll}
+        onShowAllChange={setShowAll}
         onOpenSettings={() => setMenuOpen(true)}
         onNewGame={() => setGameId((id) => id + 1)}
       />
