@@ -76,6 +76,7 @@ export function buildEntries(
           team: s.team,
           awards: s.awards,
           stats: s.stats,
+          shooting: s.shooting,
         });
       }
     } else {
@@ -92,6 +93,7 @@ export function buildEntries(
         team: null,
         awards: [],
         stats: p.career,
+        shooting: p.careerShooting,
       });
     }
   }

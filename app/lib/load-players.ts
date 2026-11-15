@@ -3,15 +3,18 @@
 // the game needs are passed to the client.
 import scraped from "@/app/data/players.json";
 import type { PlayerRecord, SeasonRecord } from "@/app/lib/players";
-import type { StatLine } from "@/app/lib/stats";
+import type { ShootingLine, StatLine } from "@/app/lib/stats";
 
-// Fields read from players.json. Older files may lack the season/award fields.
+// Fields read from players.json. Older files may lack some of them.
 type RawStats = {
   ppg?: number | null;
   rpg?: number | null;
   apg?: number | null;
   spg?: number | null;
   bpg?: number | null;
+  fg_pct?: number | null;
+  fg3_pct?: number | null;
+  ft_pct?: number | null;
 };
 type RawSeason = RawStats & {
   season: string;
@@ -39,6 +42,14 @@ function statLine(raw: RawStats): StatLine {
   };
 }
 
+function shootingLine(raw: RawStats): ShootingLine {
+  return {
+    fgPct: num(raw.fg_pct),
+    fg3Pct: num(raw.fg3_pct),
+    ftPct: num(raw.ft_pct),
+  };
+}
+
 export function loadPlayers(): PlayerRecord[] {
   return (scraped as RawPlayer[]).map((p) => ({
     id: p.id,
@@ -46,12 +57,14 @@ export function loadPlayers(): PlayerRecord[] {
     firstSeason: p.first_season ?? null,
     lastSeason: p.last_season ?? null,
     career: statLine(p),
+    careerShooting: shootingLine(p),
     seasons: (p.award_seasons ?? []).map(
       (s): SeasonRecord => ({
         season: s.season,
         team: s.team ?? null,
         awards: s.awards ?? [],
         stats: statLine(s),
+        shooting: shootingLine(s),
       }),
     ),
   }));

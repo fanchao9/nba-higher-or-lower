@@ -26,6 +26,31 @@ export const STAT_KEYS: StatKey[] = ["ppg", "rpg", "apg", "spg", "bpg"];
 
 export type StatLine = Record<StatKey, number | null>;
 
+// Shooting percentages as fractions (0.489 = 48.9%)
+export type ShootingKey = "fgPct" | "fg3Pct" | "ftPct";
+export type ShootingLine = Record<ShootingKey, number | null>;
+
+export type DisplayRow =
+  | { id: StatKey; label: string; kind: "stat" }
+  | { id: ShootingKey; label: string; kind: "pct" };
+
+export const DISPLAY_ROWS: DisplayRow[] = [
+  ...STAT_KEYS.map(
+    (key): DisplayRow => ({ id: key, label: STATS[key].short, kind: "stat" }),
+  ),
+  { id: "fgPct", label: "FG%", kind: "pct" },
+  { id: "fg3Pct", label: "3PT%", kind: "pct" },
+  { id: "ftPct", label: "FT%", kind: "pct" },
+];
+
+export function formatStat(value: number | null): string {
+  return value === null ? "–" : value.toFixed(1);
+}
+
+export function formatPct(value: number | null): string {
+  return value === null ? "–" : `${(value * 100).toFixed(1)}%`;
+}
+
 const AWARD_LABELS: Record<string, string> = {
   MVP: "MVP",
   FMVP: "Finals MVP",

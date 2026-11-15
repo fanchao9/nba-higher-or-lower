@@ -1,10 +1,16 @@
-import { STATS, type StatKey, type StatLine } from "@/app/lib/stats";
+import {
+  STATS,
+  type ShootingLine,
+  type StatKey,
+  type StatLine,
+} from "@/app/lib/stats";
 
 export type SeasonRecord = {
   season: string;
   team: string | null;
   awards: string[];
   stats: StatLine;
+  shooting: ShootingLine;
 };
 
 export type PlayerRecord = {
@@ -13,6 +19,7 @@ export type PlayerRecord = {
   firstSeason: string | null;
   lastSeason: string | null;
   career: StatLine;
+  careerShooting: ShootingLine;
   seasons: SeasonRecord[];
 };
 
@@ -24,6 +31,7 @@ export type Entry = {
   team: string | null;
   awards: string[];
   stats: StatLine;
+  shooting: ShootingLine;
 };
 
 export type Guess = "higher" | "lower";
@@ -100,6 +108,7 @@ export type Round = {
   left: Entry;
   right: Entry;
   stat: StatKey;
+  prevStat: StatKey | null;
   seen: string[];
 };
 
@@ -158,5 +167,5 @@ export function pickStartingRound(entries: Entry[], stats: StatKey[]): Round {
     }
   }
   const { stat, next, seen } = pickNextRound(entries, stats, [first.key], first);
-  return { left: first, right: next, stat, seen };
+  return { left: first, right: next, stat, prevStat: null, seen };
 }
