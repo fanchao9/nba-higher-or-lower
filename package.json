@@ -11,9 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:py": "python -m pytest",
-    "check": "npm run lint && npm run typecheck && npm run test",
-    "setup:hooks": "git config core.hooksPath .githooks"
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "next": "16.4.6",

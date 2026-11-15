@@ -45,3 +45,7 @@ next-env.d.ts
 __pycache__/
 *.pyc
 scripts/.cache_career.json
+
+# test output
+/test-results/
+/playwright-report/
