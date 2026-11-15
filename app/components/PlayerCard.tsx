@@ -167,18 +167,17 @@ function SingleStat({
   valueText,
   tone,
 }: StatBlockProps & { fromStat: StatKey | null; scope: "Career" | "Season" }) {
-  const [doneKey, setDoneKey] = useState<string | null>(null);
-  const transitionKey = fromStat ? `${fromStat}>${stat}` : "";
-  const leaving =
-    fromStat !== null && fromStat !== stat && doneKey !== transitionKey;
+  // `fromStat` is only set for a moment after a new round starts (the board
+  // clears it once the slide has played), so this block never replays the
+  // animation when it remounts, e.g. after toggling "Show all stats".
+  const leaving = fromStat !== null && fromStat !== stat;
 
   return (
     <div className="relative mt-auto overflow-hidden rounded-xl bg-surface">
       {leaving && fromStat && (
         <div
-          key={`out-${transitionKey}`}
+          data-testid="stat-slide-out"
           aria-hidden="true"
-          onAnimationEnd={() => setDoneKey(transitionKey)}
           className="stat-slide-out absolute inset-0 flex flex-col items-center px-2 py-2 sm:py-3"
         >
           <StatText
@@ -189,7 +188,6 @@ function SingleStat({
         </div>
       )}
       <div
-        key={`in-${transitionKey}`}
         className={`flex flex-col items-center px-2 py-2 sm:py-3 ${
           leaving ? "stat-slide-in" : ""
         }`}

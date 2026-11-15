@@ -203,7 +203,7 @@ export default function GameBoard({
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
         <h1 className="text-xl font-bold">Nothing matches these settings</h1>
         <p className="text-sm text-muted">
-          There aren't two {seasonMode ? "seasons" : "players"} close
+          There aren&apos;t two {seasonMode ? "seasons" : "players"} close
           enough to compare. Widen the year range, lower the award
           requirement, or pick more stats. If players.json predates the
           season/award fields, regenerate it with scripts/scrape_players.py

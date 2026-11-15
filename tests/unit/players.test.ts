@@ -18,7 +18,6 @@ describe("isValidPair (the closeness rule)", () => {
   });
 
   it("treats the gap boundaries as inclusive, ignoring float noise", () => {
-    // 24.7 - 24.5 is 0.1999999... in floating point but is exactly 0.2 to a reader.
     expect(isValidPair(entry(1, { ppg: 24.7 }), entry(2, { ppg: 24.5 }), "ppg")).toBe(true);
     expect(isValidPair(entry(1, { ppg: 30.1 }), entry(2, { ppg: 20.1 }), "ppg")).toBe(true);
   });
@@ -43,7 +42,7 @@ describe("isValidPair (the closeness rule)", () => {
   });
 
   it("uses each stat's own gap", () => {
-    // spg gap is 0.1 to 1: a 1.5 difference is too far, but fine for ppg.
+    // spg gap is 0.1 to 1
     expect(isValidPair(entry(1, { spg: 2 }), entry(2, { spg: 0.5 }), "spg")).toBe(false);
     expect(isValidPair(entry(1, { ppg: 2 }), entry(2, { ppg: 3.5 }), "ppg")).toBe(true);
   });
@@ -93,7 +92,6 @@ describe("hasEnoughEntries", () => {
   });
 });
 
-/** A pool of `n` players with well-spread ppg/rpg values and some missing spg. */
 function spreadPool(n: number): Entry[] {
   return Array.from({ length: n }, (_, i) =>
     entry(i + 1, {

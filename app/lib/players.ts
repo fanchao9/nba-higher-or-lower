@@ -108,7 +108,6 @@ export type Round = {
   left: Entry;
   right: Entry;
   stat: StatKey;
-  prevStat: StatKey | null;
   seen: string[];
 };
 
@@ -167,5 +166,5 @@ export function pickStartingRound(entries: Entry[], stats: StatKey[]): Round {
     }
   }
   const { stat, next, seen } = pickNextRound(entries, stats, [first.key], first);
-  return { left: first, right: next, stat, prevStat: null, seen };
+  return { left: first, right: next, stat, seen };
 }
