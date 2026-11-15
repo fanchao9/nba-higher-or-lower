@@ -244,7 +244,7 @@ function SettingsForm({
             ? `${preview.length} ${noun} match these settings.`
             : preview.length === 0
               ? `No ${noun} match. Widen the years or lower the award minimum.`
-              : `Only ${preview.length} ${noun} match, and none are close enough to compare.`}
+              : `Only ${preview.length} ${preview.length === 1 ? noun.replace(/s$/, "") : noun} found, which is not enough to compare.`}
         </p>
         <div className="flex items-center justify-between gap-3">
           <button
