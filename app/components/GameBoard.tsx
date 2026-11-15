@@ -19,13 +19,14 @@ import {
   type Guess,
   type Round,
 } from "@/app/lib/players";
-import { STATS, formatStat } from "@/app/lib/stats";
+import { STATS, formatStat, type StatKey } from "@/app/lib/stats";
 
 type Phase = "guessing" | "counting" | "result" | "sliding" | "gameover";
 
 const COUNT_MS = 1600;
 const RESULT_PAUSE_MS = 900;
 const SLIDE_MS = 650;
+const STAT_SLIDE_CLEAR_MS = 600;
 
 const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
 
@@ -61,6 +62,8 @@ export default function GameBoard({
   const [score, setScore] = useState(0);
   const [displayValue, setDisplayValue] = useState(0);
   const [slideDx, setSlideDx] = useState(0);
+  // Stat shown in the previous round; drives the left card's stat slide.
+  const [prevStat, setPrevStat] = useState<StatKey | null>(null);
   const arenaRef = useRef<HTMLElement>(null);
 
   const correct =
@@ -143,13 +146,8 @@ export default function GameBoard({
         round.seen,
         round.right,
       );
-      setRound({
-        left: round.right,
-        right: next,
-        stat,
-        prevStat: round.stat,
-        seen,
-      });
+      setPrevStat(round.stat);
+      setRound({ left: round.right, right: next, stat, seen });
       setGuess(null);
       setDisplayValue(0);
       setSlideDx(0);
@@ -158,6 +156,16 @@ export default function GameBoard({
 
     return () => clearTimeout(timer);
   }, [phase, round, entries, stats]);
+
+  // The stat slide only plays right after a new round starts. Clear prevStat
+  // once it has finished (a little longer than .stat-slide-* in globals.css)
+  // so remounting the card later, e.g. toggling "Show all stats", doesn't
+  // replay it.
+  useEffect(() => {
+    if (prevStat === null) return;
+    const timer = setTimeout(() => setPrevStat(null), STAT_SLIDE_CLEAR_MS);
+    return () => clearTimeout(timer);
+  }, [prevStat]);
 
   function handleGuess(choice: Guess) {
     if (phase !== "guessing") return;
@@ -224,7 +232,10 @@ export default function GameBoard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-full border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold tabular-nums sm:text-base">
+          <div
+            data-testid="score"
+            className="rounded-full border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold tabular-nums sm:text-base"
+          >
             Score <span className="ml-1 text-accent">{score}</span>
           </div>
           <button
@@ -252,7 +263,10 @@ export default function GameBoard({
         </div>
       </header>
 
-      <p className="mb-3 text-center text-sm font-medium text-muted sm:mb-4 sm:text-lg">
+      <p
+        data-testid="question"
+        className="mb-3 text-center text-sm font-medium text-muted sm:mb-4 sm:text-lg"
+      >
         {round ? (
           <>
             Does <strong className="text-foreground">{round.right.name}</strong>
@@ -293,7 +307,7 @@ export default function GameBoard({
               entry={round.left}
               slot="left"
               stat={round.stat}
-              fromStat={round.prevStat}
+              fromStat={prevStat}
               scope={scope}
               showAll={showAll}
               valueText={format(round.left.stats[round.stat])}
