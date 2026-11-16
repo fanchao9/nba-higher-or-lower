@@ -10,7 +10,9 @@ The data (about 1,100 players with 500+ career games, plus their award-winning s
 - **Career mode (default):** compares career averages.
 - **Season mode:** compares award-winning seasons (MVP, Finals MVP, DPOY, ROY, MIP, 6th Man, Clutch POY, All-NBA), for example one MVP year against another.
 - **Pairings are fair:** two cards are only paired when their values differ by a sensible amount (for PPG, between 0.2 and 10). A tie never happens, and the same player never appears on both sides.
-- **Show all stats:** the toggle under the question lists PPG, RPG, APG, SPG, BPG, FG%, 3PT% and FT% on each card. Only the stat being compared is hidden (`??`) on the right card.
+- **Show all stats:** the toggle under the question lists PPG, RPG, APG, SPG, BPG, FG%, 3PT% and FT% on each card. Only the stat being compared is hidden (`??`) on the right card. The cards grow and shrink smoothly when you switch.
+- **Keyboard:** `↑` or `H` guesses higher, `↓` or `L` guesses lower. The shortcuts pause while the settings menu is open.
+- **Best score:** saved in your browser (`localStorage`), separately for career and season mode.
 - **Settings menu:** the button in the top right opens a menu with:
   - a **Compare seasons** switch
   - a two-handle **year range** slider (by the year a season ends, so 2024 means 2023-24)
@@ -30,7 +32,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). A production build is `npm run build` then `npm start`.
 
-The repo includes a generated `app/data/players.json`, so the game works right after install. Player photos load from `cdn.nba.com` (allowed in `next.config.ts`). If a photo fails, the card shows the player's initials.
+The repo includes a generated `app/data/players.json`, so the game works right after install. Player photos load from `cdn.nba.com` (allowed in `next.config.ts`). The NBA has no photo for roughly half of the players (mostly older ones) and serves one generic silhouette for them, so those cards show the player's initials over a half-court drawing instead. The scraper records which players have a photo.
 
 ## Updating the data
 
@@ -54,6 +56,7 @@ On macOS or Linux, use `.venv/bin/python` instead.
 | 1 | Career totals and every season's stat line, for all ~5,200 players | about 85 min |
 | 2 | Career FG%, 3P% and FT% for caches built before those fields existed (one time only) | about 20 min |
 | 3 | Awards, only for players with 500+ career games | about 20 min |
+| 4 | Which of those players have a real photo on `cdn.nba.com` (cheap HEAD requests) | about 1 min |
 
 - **Interrupting:** press Ctrl+C at any time. Progress is cached in `scripts/.cache_career.json` (gitignored) and saved every 20 players, so you lose at most 19. Re-run with `--resume` to continue.
 - **Output:** `app/data/players.json` is written only when every stage finishes, so an interrupted run leaves the old file untouched.
@@ -89,6 +92,7 @@ app/
     filters.ts           settings type, defaults, building the card pool
     stats.ts             stat definitions, per-stat gaps, number formatting
     load-players.ts      reads players.json (server only)
+    best-score.ts        best score in localStorage
   data/players.json      scraper output
 scripts/
   scrape_players.py      builds players.json
