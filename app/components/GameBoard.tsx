@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -9,6 +10,12 @@ import {
 } from "react";
 import PlayerCard, { type StatTone } from "@/app/components/PlayerCard";
 import Switch from "@/app/components/Switch";
+import {
+  readBestScore,
+  recordScore,
+  useBestScore,
+  type ScoreMode,
+} from "@/app/lib/best-score";
 import type { GameSettings } from "@/app/lib/filters";
 import {
   hasEnoughEntries,
@@ -41,6 +48,8 @@ type GameBoardProps = {
   onShowAllChange: (showAll: boolean) => void;
   onOpenSettings: () => void;
   onNewGame: () => void;
+  // True while the settings menu is open: keyboard shortcuts are off.
+  paused: boolean;
 };
 
 export default function GameBoard({
@@ -50,8 +59,13 @@ export default function GameBoard({
   onShowAllChange,
   onOpenSettings,
   onNewGame,
+  paused,
 }: GameBoardProps) {
   const { stats, seasonMode } = settings;
+  const scoreMode: ScoreMode = seasonMode ? "season" : "career";
+  const best = useBestScore(scoreMode);
+  // The best score when this game started, to tell "new best" from "tied".
+  const [bestAtStart] = useState(() => readBestScore(scoreMode));
   const enough = useMemo(
     () => hasEnoughEntries(entries, stats),
     [entries, stats],
@@ -157,22 +171,55 @@ export default function GameBoard({
     return () => clearTimeout(timer);
   }, [phase, round, entries, stats]);
 
-  // The stat slide only plays right after a new round starts. Clear prevStat
-  // once it has finished (a little longer than .stat-slide-* in globals.css)
-  // so remounting the card later, e.g. toggling "Show all stats", doesn't
-  // replay it.
   useEffect(() => {
     if (prevStat === null) return;
     const timer = setTimeout(() => setPrevStat(null), STAT_SLIDE_CLEAR_MS);
     return () => clearTimeout(timer);
   }, [prevStat]);
 
-  function handleGuess(choice: Guess) {
-    if (phase !== "guessing") return;
-    setGuess(choice);
-    setDisplayValue(0);
-    setPhase("counting");
-  }
+  useEffect(() => {
+    recordScore(scoreMode, score);
+  }, [scoreMode, score]);
+
+  const handleGuess = useCallback(
+    (choice: Guess) => {
+      if (phase !== "guessing") return;
+      setGuess(choice);
+      setDisplayValue(0);
+      setPhase("counting");
+    },
+    [phase],
+  );
+
+  useEffect(() => {
+    if (paused || !enough || !round) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.repeat) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName))
+      ) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      const choice: Guess | null =
+        key === "arrowup" || key === "h"
+          ? "higher"
+          : key === "arrowdown" || key === "l"
+            ? "lower"
+            : null;
+      if (!choice || phase !== "guessing") return;
+      e.preventDefault(); // stop the arrow keys from scrolling the page
+      handleGuess(choice);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [paused, enough, round, phase, handleGuess]);
 
   const canGuess = phase === "guessing";
   const revealed = phase !== "guessing";
@@ -234,9 +281,16 @@ export default function GameBoard({
         <div className="flex items-center gap-2">
           <div
             data-testid="score"
-            className="rounded-full border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold tabular-nums sm:text-base"
+            className="rounded-full border border-border bg-surface-raised px-4 py-1 text-center text-sm font-semibold leading-tight tabular-nums sm:text-base"
           >
-            Score <span className="ml-1 text-accent">{score}</span>
+            <div>
+              Score <span className="ml-1 text-accent">{score}</span>
+            </div>
+            {Math.max(best, score) > 0 && (
+              <div className="text-[0.65rem] font-medium text-muted sm:text-xs">
+                Best {Math.max(best, score)}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -361,20 +415,39 @@ export default function GameBoard({
       </p>
 
       {phase === "gameover" && round && (
-        <div className="card-enter mx-auto mt-8 flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border border-border bg-surface-raised p-6 text-center shadow-[0_12px_32px_-16px_rgba(90,70,30,0.45)]">
-          <p className="text-lg font-semibold">Game over</p>
+        <div
+          data-testid="game-over"
+          className="card-enter mx-auto mt-8 flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border border-border bg-surface-raised p-6 text-center shadow-[0_12px_32px_-16px_rgba(90,70,30,0.45)]"
+        >
+          <p className="text-lg font-semibold">Not quite</p>
           <p className="text-sm text-muted">
-            {round.right.name}
+            <strong className="text-foreground">{round.right.name}</strong>
             {round.right.season ? ` (${round.right.season})` : ""} had{" "}
-            <span className="font-semibold text-foreground">
+            <strong className="text-foreground">
               {format(round.right.stats[round.stat])}
-            </span>{" "}
-            {statDef.short}. Final score:{" "}
-            <span className="font-semibold text-foreground">{score}</span>
+            </strong>{" "}
+            {statDef.short}, against{" "}
+            <strong className="text-foreground">
+              {format(round.left.stats[round.stat])}
+            </strong>{" "}
+            for {round.left.name}.
           </p>
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-2xl font-bold tabular-nums">
+              Score <span className="text-accent">{score}</span>
+            </p>
+            {score > bestAtStart ? (
+              <span className="rounded-full bg-accent/15 px-3 py-0.5 text-xs font-bold text-accent">
+                New best!
+              </span>
+            ) : bestAtStart > 0 ? (
+              <span className="text-xs text-muted">Best {bestAtStart}</span>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
+              autoFocus
               onClick={onNewGame}
               className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-contrast transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
@@ -390,6 +463,11 @@ export default function GameBoard({
           </div>
         </div>
       )}
+
+      <footer className="mt-auto pt-10 text-center text-xs text-muted">
+        Fan project, not affiliated with or endorsed by the NBA. Stats and
+        photos belong to their owners.
+      </footer>
     </main>
   );
 }
@@ -433,6 +511,12 @@ function GuessButton({
       </span>
       <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-muted sm:text-xs">
         {label}
+        <kbd
+          aria-hidden="true"
+          className="ml-1 hidden rounded border border-border bg-surface px-1 font-sans text-[0.65rem] normal-case sm:inline-block"
+        >
+          {direction === "up" ? "↑" : "↓"}
+        </kbd>
       </span>
     </button>
   );

@@ -34,7 +34,7 @@ test.describe("the game", () => {
     await expect(rightCard(page)).not.toContainText("??", { timeout: 5_000 });
 
     // Then: wrong -> game over panel, right -> a fresh round with score 1.
-    const gameOver = page.getByText("Game over");
+    const gameOver = page.getByTestId("game-over");
     const nextRound = rightCard(page).getByText("??");
     await expect(gameOver.or(nextRound)).toBeVisible({ timeout: 15_000 });
     if (await gameOver.isVisible()) {
@@ -49,9 +49,9 @@ test.describe("the game", () => {
     for (let i = 0; i < 40; i++) {
       if ((await guessOnce(page, i % 2 ? "Higher" : "Lower")) === "over") break;
     }
-    await expect(page.getByText("Game over")).toBeVisible();
+    await expect(page.getByTestId("game-over")).toBeVisible();
     await page.getByRole("button", { name: "Play again" }).click();
-    await expect(page.getByText("Game over")).toBeHidden();
+    await expect(page.getByTestId("game-over")).toBeHidden();
     await expect(page.getByTestId("score")).toContainText("0");
     await expect(rightCard(page)).toContainText("??");
   });
@@ -107,7 +107,7 @@ test.describe("settings menu", () => {
     await applySettings(page, async (dialog) => {
       await dialog.getByRole("switch", { name: "Compare seasons" }).click();
     });
-    await expect(page.getByText("Award-winning seasons")).toBeVisible();
+    await expect(page.getByText("Award-winning seasons", { exact: true })).toBeVisible();
     // Season cards show "2015-16 · TEAM".
     await expect(rightCard(page)).toContainText(/\d{4}-\d{2}/);
     await expect(page.getByTestId("score")).toContainText("0");
@@ -194,7 +194,7 @@ test.describe("show all stats", () => {
       const outcome = await guessOnce(page, i % 2 ? "Higher" : "Lower");
       if (outcome === "over") {
         await page.getByRole("button", { name: "Play again" }).click();
-        await expect(page.getByText("Game over")).toBeHidden();
+        await expect(page.getByTestId("game-over")).toBeHidden();
         continue;
       }
       changed = (await currentStat(page)) !== before;

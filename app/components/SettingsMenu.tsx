@@ -17,6 +17,7 @@ const MAX_AWARD_FILTER = 10;
 
 type SettingsMenuProps = {
   open: boolean;
+  formKey: number;
   settings: GameSettings;
   players: PlayerRecord[];
   bounds: YearBounds;
@@ -26,6 +27,7 @@ type SettingsMenuProps = {
 
 export default function SettingsMenu({
   open,
+  formKey,
   settings,
   players,
   bounds,
@@ -50,17 +52,18 @@ export default function SettingsMenu({
         if (e.target === dialogRef.current) onClose();
       }}
       aria-labelledby="settings-title"
-      className="m-auto max-h-[92dvh] w-[min(34rem,calc(100vw-1rem))] overflow-y-auto rounded-3xl border border-border bg-surface-raised p-0 text-foreground shadow-[0_24px_60px_-20px_rgba(60,40,10,0.55)] backdrop:bg-[#2b2419]/45"
+      className="settings-dialog m-auto max-h-[92dvh] w-[min(34rem,calc(100vw-1rem))] overflow-y-auto rounded-3xl border border-border bg-surface-raised p-0 text-foreground shadow-[0_24px_60px_-20px_rgba(60,40,10,0.55)]"
     >
-      {open && (
-        <SettingsForm
-          settings={settings}
-          players={players}
-          bounds={bounds}
-          onApply={onApply}
-          onClose={onClose}
-        />
-      )}
+      {/* Always mounted so the content is still there while the dialog fades
+          out; the key restarts the form (a fresh draft) on every open. */}
+      <SettingsForm
+        key={formKey}
+        settings={settings}
+        players={players}
+        bounds={bounds}
+        onApply={onApply}
+        onClose={onClose}
+      />
     </dialog>
   );
 }
@@ -71,7 +74,7 @@ function SettingsForm({
   bounds,
   onApply,
   onClose,
-}: Omit<SettingsMenuProps, "open">) {
+}: Omit<SettingsMenuProps, "open" | "formKey">) {
   const [draft, setDraft] = useState<GameSettings>(settings);
 
   const preview = useMemo(() => buildEntries(players, draft), [players, draft]);

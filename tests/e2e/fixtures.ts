@@ -60,7 +60,7 @@ export async function guessOnce(
 ): Promise<"next" | "over"> {
   const before = await page.getByTestId("question").textContent();
   await page.getByRole("button", { name: guess, exact: true }).click();
-  const gameOver = page.getByText("Game over");
+  const gameOver = page.getByTestId("game-over");
   let outcome: "next" | "over" | "pending" = "pending";
   await expect
     .poll(
