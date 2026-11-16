@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { headshotUrl, type Entry } from "@/app/lib/players";
 import {
   DISPLAY_ROWS,
@@ -80,13 +86,8 @@ export default function PlayerCard({
       className={`card-enter ${motionClass} flex h-full min-w-0 flex-col gap-2 rounded-2xl border border-border bg-surface-raised p-2.5 shadow-[0_12px_32px_-16px_rgba(90,70,30,0.45)] sm:gap-3 sm:rounded-3xl sm:p-4`}
     >
       <div className="relative aspect-[1040/760] w-full overflow-hidden rounded-xl bg-photo sm:rounded-2xl">
-        {imageFailed ? (
-          <div
-            aria-hidden="true"
-            className="grid h-full w-full place-items-center text-3xl font-semibold text-muted sm:text-5xl"
-          >
-            {initials(entry.name)}
-          </div>
+        {entry.hasPhoto === false || imageFailed ? (
+          <Monogram name={entry.name} />
         ) : (
           <Image
             src={headshotUrl(entry.playerId)}
@@ -131,24 +132,42 @@ export default function PlayerCard({
         </div>
       )}
 
-      {showAll ? (
-        <AllStats
-          entry={entry}
-          stat={stat}
-          valueText={valueText}
-          tone={tone}
-        />
-      ) : (
-        <SingleStat
-          entry={entry}
-          stat={stat}
-          fromStat={fromStat}
-          scope={scope}
-          valueText={valueText}
-          tone={tone}
-        />
-      )}
+      <StatArea
+        showAll={showAll}
+        entry={entry}
+        stat={stat}
+        fromStat={fromStat}
+        scope={scope}
+        valueText={valueText}
+        tone={tone}
+      />
     </article>
+  );
+}
+
+// Shown when the NBA has no photo for a player
+function Monogram({ name }: { name: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="relative grid h-full w-full place-items-center bg-gradient-to-b from-photo to-border"
+    >
+      <svg
+        viewBox="0 0 260 190"
+        preserveAspectRatio="xMidYMid slice"
+        className="absolute inset-0 h-full w-full text-muted/20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path d="M30 190C30 100 75 40 130 40s100 60 100 190" />
+        <path d="M72 190V92h116v98" />
+        <circle cx="130" cy="92" r="40" />
+      </svg>
+      <span className="relative text-4xl font-bold tracking-wide text-muted sm:text-6xl">
+        {initials(name)}
+      </span>
+    </div>
   );
 }
 
@@ -158,6 +177,93 @@ type StatBlockProps = {
   valueText: string;
   tone: StatTone;
 };
+
+const STAT_AREA_SETTLE_MS = 530;
+
+function StatArea({
+  showAll,
+  fromStat,
+  scope,
+  ...block
+}: StatBlockProps & {
+  showAll: boolean;
+  fromStat: StatKey | null;
+  scope: "Career" | "Season";
+}) {
+  // `shown` is the view on screen. `leaving` is the view fading out (true =
+  // the full list, false = the single stat, null = none).
+  const [shown, setShown] = useState(showAll);
+  const [leaving, setLeaving] = useState<boolean | null>(null);
+  if (showAll !== shown) {
+    setShown(showAll);
+    setLeaving(shown);
+  }
+
+  const areaRef = useRef<HTMLDivElement>(null);
+  const lastHeight = useRef<number | null>(null);
+
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([item]) => {
+      lastHeight.current = item.contentRect.height;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = areaRef.current;
+    const from = lastHeight.current;
+    if (!el || from === null) return;
+    el.style.transition = "none";
+    el.style.height = "auto";
+    const to = el.offsetHeight;
+    if (to === from) {
+      el.style.transition = "";
+      el.style.height = "";
+      return;
+    }
+    el.style.height = `${from}px`;
+    void el.offsetHeight;
+    el.style.transition = "";
+    el.style.height = `${to}px`;
+  }, [shown]);
+
+  useEffect(() => {
+    if (leaving === null) return;
+    const timer = setTimeout(() => {
+      setLeaving(null);
+      if (areaRef.current) areaRef.current.style.height = "";
+    }, STAT_AREA_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [leaving, shown]);
+
+  const layerClass = (isAll: boolean) =>
+    leaving === isAll
+      ? "stat-area-out absolute inset-x-0 top-0"
+      : leaving !== null
+        ? "stat-area-in"
+        : "";
+
+  return (
+    <div
+      ref={areaRef}
+      className="stat-area relative mt-auto overflow-hidden rounded-xl bg-surface"
+    >
+      {(!shown || leaving === false) && (
+        <div key="single" className={layerClass(false)} inert={leaving === false}>
+          <SingleStat {...block} fromStat={fromStat} scope={scope} />
+        </div>
+      )}
+      {(shown || leaving === true) && (
+        <div key="all" className={layerClass(true)} inert={leaving === true}>
+          <AllStats {...block} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SingleStat({
   entry,
@@ -173,7 +279,7 @@ function SingleStat({
   const leaving = fromStat !== null && fromStat !== stat;
 
   return (
-    <div className="relative mt-auto overflow-hidden rounded-xl bg-surface">
+    <div className="relative overflow-hidden rounded-xl">
       {leaving && fromStat && (
         <div
           data-testid="stat-slide-out"
@@ -229,7 +335,7 @@ function AllStats({ entry, stat, valueText, tone }: StatBlockProps) {
   const index = STAT_KEYS.indexOf(stat);
 
   return (
-    <div className="mt-auto rounded-xl bg-surface p-1.5 sm:p-2">
+    <div className="p-1.5 sm:p-2">
       <div className="relative [--row-h:1.5rem] sm:[--row-h:1.75rem]">
         <div
           aria-hidden="true"
