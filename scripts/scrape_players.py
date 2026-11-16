@@ -9,6 +9,8 @@ WHAT IT DOES
   4. For notable players only, fetches their awards (one more request each).
      (A cache from an older version also gets a one-time backfill of career
      FG%/3P%/FT%: one extra request per notable player, ~20 minutes.)
+     Finally checks which notable players have a real photo on cdn.nba.com
+     (a HEAD request each, about a minute in total; no NBA stats rate limit).
   5. Computes per-game rate stats + a popularity proxy.
   6. Keeps only each player's AWARD-WINNING seasons (see AWARD_CODES), with
      that season's stats, for the season-vs-season game mode.
@@ -48,8 +50,10 @@ import argparse
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import requests
 from nba_api.stats.static import players as static_players
 from nba_api.stats.endpoints import playerawards, playercareerstats
 from requests.exceptions import ReadTimeout, ConnectionError as ReqConnectionError
@@ -60,6 +64,12 @@ REQUEST_PAUSE_SEC = 0.6      # delay between stats.nba.com calls (rate limiting)
 REQUEST_TIMEOUT_SEC = 30
 MAX_RETRIES = 3
 RETRY_BACKOFF_SEC = 2.0
+
+# Players without a photo all get the same generic silhouette from the NBA's
+# CDN (identical bytes, so identical Content-Length) instead of a 404.
+HEADSHOT_URL = "https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+HEADSHOT_PLACEHOLDER_BYTES = 12430
+HEADSHOT_WORKERS = 6
 
 AWARD_CODES = {
     "NBA Most Valuable Player": "MVP",
@@ -242,6 +252,25 @@ def fetch_awards(player_id: int) -> list | None:
     return _with_retries(call)
 
 
+def has_headshot(player_id: int) -> bool | None:
+    """True if the NBA CDN has a real photo for this player.
+
+    False for the generic silhouette (or a missing image); None if the check
+    itself failed, so the player is retried on --resume.
+    """
+    def call() -> bool:
+        response = requests.head(
+            HEADSHOT_URL.format(player_id=player_id),
+            timeout=REQUEST_TIMEOUT_SEC,
+        )
+        if response.status_code != 200:
+            return False
+        size = int(response.headers.get("Content-Length", -1))
+        return size != HEADSHOT_PLACEHOLDER_BYTES
+
+    return _with_retries(call)
+
+
 def award_code(description: str, all_nba_team: str) -> str | None:
     """Map a raw award to its short code, or None if we don't keep it."""
     if description == ALL_NBA_DESCRIPTION:
@@ -321,7 +350,7 @@ def build_dataset(cache: dict) -> list[dict]:
             "name": rec["name"],
             "teams": stats["teams"],
             "seasons": stats["seasons"],
-            # first/last season played, e.g. "1984-85" (for era filters)
+            # first/last season played
             "first_season": min(season_ids) if season_ids else None,
             "last_season": max(season_ids) if season_ids else None,
             "gp": gp,
@@ -346,8 +375,8 @@ def build_dataset(cache: dict) -> list[dict]:
             "popularity": (stats["pts"] or 0) + gp * 10,
             # seasons with an MVP / All-NBA / etc., for the season game mode
             "award_seasons": build_award_seasons(stats, rec.get("awards")),
+            "has_headshot": rec.get("has_headshot"),
         })
-    # Sort by popularity so the file is easy to eyeball. game re-sorts anyway.
     out.sort(key=lambda p: p["popularity"], reverse=True)
     return out
 
@@ -375,7 +404,7 @@ def main() -> None:
     print(f"Filter: >= {MIN_CAREER_GP} career games, regular season only\n")
 
     # Stage 1: career + per-season stats for every player
-    print("Stage 1/3: career and season stats")
+    print("Stage 1/4: career and season stats")
     for i, p in enumerate(roster, start=1):
         pid = str(p["id"])
         name = p["full_name"]
@@ -388,8 +417,9 @@ def main() -> None:
         stats = fetch_career_totals(p["id"])
         prior = cache.get(pid, {})
         cache[pid] = {"name": name, "stats": stats}
-        if "awards" in prior:
-            cache[pid]["awards"] = prior["awards"]
+        for key in ("awards", "has_headshot"):
+            if key in prior:
+                cache[pid][key] = prior[key]
 
         # Persist cache every 20 players so an interrupt loses little work.
         if i % 20 == 0:
@@ -412,7 +442,7 @@ def main() -> None:
     # Stage 2: backfill career shooting percentages. Caches built before
     # those fields existed need one extra request per notable player (once).
     missing = [(pid, rec) for pid, rec in notable if "fg_pct" not in rec["stats"]]
-    print(f"\nStage 2/3: shooting percentages for {len(missing)} notable players")
+    print(f"\nStage 2/4: shooting percentages for {len(missing)} notable players")
     for n, (pid, rec) in enumerate(missing, start=1):
         print(f"[{n}/{len(missing)}] {rec['name']} (id={pid}) shooting %")
         stats = fetch_career_totals(int(pid))
@@ -428,7 +458,7 @@ def main() -> None:
     save_cache(cache)
 
     # Stage 3: awards, only for players who pass the games filter
-    print(f"\nStage 3/3: awards for {len(notable)} notable players")
+    print(f"\nStage 3/4: awards for {len(notable)} notable players")
     for n, (pid, rec) in enumerate(notable, start=1):
         if args.resume and "awards" in rec:
             continue
@@ -443,6 +473,24 @@ def main() -> None:
             print(f"    ...cache checkpoint saved ({len(cache)} entries)")
 
         time.sleep(REQUEST_PAUSE_SEC)
+
+    save_cache(cache)
+
+    # Stage 4: which notable players have a real photo (the game shows a
+    # monogram card for the rest). cdn.nba.com has no stats-style throttling,
+    # so a few requests run in parallel.
+    todo = [
+        (pid, rec) for pid, rec in notable
+        if not (args.resume and "has_headshot" in rec)
+    ]
+    print(f"\nStage 4/4: photos for {len(todo)} notable players")
+    with ThreadPoolExecutor(HEADSHOT_WORKERS) as pool:
+        flags = list(pool.map(lambda item: has_headshot(int(item[0])), todo))
+    for (pid, rec), flag in zip(todo, flags):
+        if flag is not None:
+            rec["has_headshot"] = flag
+    print(f"  {sum(1 for f in flags if f is False)} without a photo, "
+          f"{sum(1 for f in flags if f is None)} checks failed")
 
     save_cache(cache)
     print(f"\nRaw cache saved: {CACHE_PATH}")

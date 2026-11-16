@@ -21,6 +21,7 @@ export type PlayerRecord = {
   career: StatLine;
   careerShooting: ShootingLine;
   seasons: SeasonRecord[];
+  hasPhoto?: boolean;
 };
 
 export type Entry = {
@@ -32,6 +33,7 @@ export type Entry = {
   awards: string[];
   stats: StatLine;
   shooting: ShootingLine;
+  hasPhoto?: boolean;
 };
 
 export type Guess = "higher" | "lower";

@@ -77,6 +77,7 @@ export function buildEntries(
           awards: s.awards,
           stats: s.stats,
           shooting: s.shooting,
+          hasPhoto: p.hasPhoto,
         });
       }
     } else {
@@ -94,6 +95,7 @@ export function buildEntries(
         awards: [],
         stats: p.career,
         shooting: p.careerShooting,
+        hasPhoto: p.hasPhoto,
       });
     }
   }

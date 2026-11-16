@@ -27,6 +27,7 @@ type RawPlayer = RawStats & {
   first_season?: string | null;
   last_season?: string | null;
   award_seasons?: RawSeason[];
+  has_headshot?: boolean | null;
 };
 
 const num = (v: number | null | undefined): number | null =>
@@ -58,6 +59,7 @@ export function loadPlayers(): PlayerRecord[] {
     lastSeason: p.last_season ?? null,
     career: statLine(p),
     careerShooting: shootingLine(p),
+    hasPhoto: p.has_headshot !== false,
     seasons: (p.award_seasons ?? []).map(
       (s): SeasonRecord => ({
         season: s.season,
