@@ -181,3 +181,89 @@ body {
     transition-duration: 1ms;
   }
 }
+
+.settings-dialog {
+  opacity: 0;
+  transform: translateY(1rem) scale(0.98);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+}
+
+.settings-dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+
+.settings-dialog::backdrop {
+  background-color: rgba(43, 36, 25, 0);
+  transition:
+    background-color 220ms ease,
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+}
+
+.settings-dialog[open]::backdrop {
+  background-color: rgba(43, 36, 25, 0.45);
+}
+
+@starting-style {
+  .settings-dialog[open] {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+
+  .settings-dialog[open]::backdrop {
+    background-color: rgba(43, 36, 25, 0);
+  }
+}
+
+.stat-area {
+  transition: height 450ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@keyframes stat-area-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stat-area-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.stat-area-in {
+  animation: stat-area-in 380ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms backwards;
+}
+
+.stat-area-out {
+  animation: stat-area-out 180ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-dialog,
+  .settings-dialog::backdrop {
+    transition-duration: 1ms;
+  }
+  .stat-area {
+    transition-duration: 1ms;
+  }
+  .stat-area-in {
+    animation: none;
+  }
+  .stat-area-out {
+    display: none;
+  }
+}
