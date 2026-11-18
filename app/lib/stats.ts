@@ -9,17 +9,16 @@ export type StatGap = { min: number; max: number };
 
 export type StatDef = {
   key: StatKey;
-  label: string;
   short: string;
   gap: StatGap;
 };
 
 export const STATS: Record<StatKey, StatDef> = {
-  ppg: { key: "ppg", label: "Points per game", short: "PPG", gap: { min: 0.2, max: 10 } },
-  rpg: { key: "rpg", label: "Rebounds per game", short: "RPG", gap: { min: 0.3, max: 6 } },
-  apg: { key: "apg", label: "Assists per game", short: "APG", gap: { min: 0.3, max: 4 } },
-  spg: { key: "spg", label: "Steals per game", short: "SPG", gap: { min: 0.1, max: 1 } },
-  bpg: { key: "bpg", label: "Blocks per game", short: "BPG", gap: { min: 0.1, max: 1.5 } },
+  ppg: { key: "ppg", short: "PPG", gap: { min: 0.2, max: 10 } },
+  rpg: { key: "rpg", short: "RPG", gap: { min: 0.3, max: 6 } },
+  apg: { key: "apg", short: "APG", gap: { min: 0.3, max: 4 } },
+  spg: { key: "spg", short: "SPG", gap: { min: 0.1, max: 1 } },
+  bpg: { key: "bpg", short: "BPG", gap: { min: 0.1, max: 1.5 } },
 };
 
 export const STAT_KEYS: StatKey[] = ["ppg", "rpg", "apg", "spg", "bpg"];

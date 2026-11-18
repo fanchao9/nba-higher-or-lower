@@ -233,7 +233,6 @@ export default function GameBoard({
   const stat = round?.stat ?? stats[0];
   const statDef = STATS[stat];
   const scope = seasonMode ? "Season" : "Career";
-  const format = formatStat;
 
   const rightValue = !round
     ? "??"
@@ -241,7 +240,7 @@ export default function GameBoard({
       ? "??"
       : phase === "counting"
         ? displayValue.toFixed(1)
-        : format(round.right.stats[round.stat]);
+        : formatStat(round.right.stats[round.stat]);
 
   const arenaStyle = { "--slide-ms": `${SLIDE_MS}ms` } as CSSProperties;
 
@@ -364,7 +363,7 @@ export default function GameBoard({
               fromStat={prevStat}
               scope={scope}
               showAll={showAll}
-              valueText={format(round.left.stats[round.stat])}
+              valueText={formatStat(round.left.stats[round.stat])}
               motion={phase === "sliding" ? "leave" : "idle"}
             />
             <PlayerCard
@@ -424,11 +423,11 @@ export default function GameBoard({
             <strong className="text-foreground">{round.right.name}</strong>
             {round.right.season ? ` (${round.right.season})` : ""} had{" "}
             <strong className="text-foreground">
-              {format(round.right.stats[round.stat])}
+              {formatStat(round.right.stats[round.stat])}
             </strong>{" "}
             {statDef.short}, against{" "}
             <strong className="text-foreground">
-              {format(round.left.stats[round.stat])}
+              {formatStat(round.left.stats[round.stat])}
             </strong>{" "}
             for {round.left.name}.
           </p>

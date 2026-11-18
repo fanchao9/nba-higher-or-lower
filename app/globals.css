@@ -28,7 +28,6 @@
   --color-correct: var(--correct);
   --color-wrong: var(--wrong);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 body {
@@ -63,17 +62,6 @@ body {
     opacity calc(var(--slide-ms, 650ms) * 0.7) ease,
     transform calc(var(--slide-ms, 650ms) * 0.7) ease;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .card-enter {
-    animation: none;
-  }
-  .card-sliding,
-  .card-leaving {
-    transition-duration: 1ms;
-  }
-}
-
 
 /* Two thumb year slider */
 .dual-range input[type="range"] {
@@ -170,18 +158,6 @@ body {
   transition: transform 450ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .stat-slide-out {
-    display: none;
-  }
-  .stat-slide-in {
-    animation: none;
-  }
-  .stat-highlight {
-    transition-duration: 1ms;
-  }
-}
-
 .settings-dialog {
   opacity: 0;
   transform: translateY(1rem) scale(0.98);
@@ -252,18 +228,23 @@ body {
   animation: stat-area-out 180ms ease-out both;
 }
 
+/* Reduced motion: no animations, and leaving layers are hidden outright. */
 @media (prefers-reduced-motion: reduce) {
-  .settings-dialog,
-  .settings-dialog::backdrop {
-    transition-duration: 1ms;
-  }
-  .stat-area {
-    transition-duration: 1ms;
-  }
+  .card-enter,
+  .stat-slide-in,
   .stat-area-in {
     animation: none;
   }
+  .stat-slide-out,
   .stat-area-out {
     display: none;
+  }
+  .card-sliding,
+  .card-leaving,
+  .stat-highlight,
+  .stat-area,
+  .settings-dialog,
+  .settings-dialog::backdrop {
+    transition-duration: 1ms;
   }
 }

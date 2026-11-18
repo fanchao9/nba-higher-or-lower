@@ -232,7 +232,8 @@ function SettingsForm({
         </div>
         <p className="text-xs text-muted">
           Each round picks one of the checked stats at random (at least one is
-          required). Players without data for a stat before the 1970s, are skipped for it.
+          required). Players with no data for a stat (like steals before the
+          1970s) are skipped for it.
         </p>
       </fieldset>
 
